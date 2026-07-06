@@ -9,28 +9,33 @@ import { jsonOk, jsonError, zodErrorResponse } from "@/lib/apiHelpers";
 
 // GET /api/complaints — admins get all complaints; others get their own.
 export async function GET(req: NextRequest) {
-  const session = await getSessionFromRequest(req);
-  if (!session) return jsonError("Not authenticated", 401);
+  try {
+    const session = await getSessionFromRequest(req);
+    if (!session) return jsonError("Not authenticated", 401);
 
-  await connectDB();
+    await connectDB();
 
-  const { searchParams } = new URL(req.url);
-  const status = searchParams.get("status");
-  const category = searchParams.get("category");
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status");
+    const category = searchParams.get("category");
 
-  const filter: Record<string, unknown> = {};
-  if (session.role !== "admin") {
-    filter.user = session.userId;
+    const filter: Record<string, unknown> = {};
+    if (session.role !== "admin") {
+      filter.user = session.userId;
+    }
+    if (status) filter.status = status;
+    if (category) filter.category = category;
+
+    const complaints = await Complaint.find(filter)
+      .populate("user", "name email role department")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return jsonOk({ complaints });
+  } catch (err) {
+    console.error("List complaints error:", err);
+    return jsonError("Could not load complaints. Please try again.", 500);
   }
-  if (status) filter.status = status;
-  if (category) filter.category = category;
-
-  const complaints = await Complaint.find(filter)
-    .populate("user", "name email role department")
-    .sort({ createdAt: -1 })
-    .lean();
-
-  return jsonOk({ complaints });
 }
 
 // POST /api/complaints — students & faculty submit complaints.

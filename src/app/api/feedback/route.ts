@@ -8,27 +8,32 @@ import { jsonOk, jsonError, zodErrorResponse } from "@/lib/apiHelpers";
 
 // GET /api/feedback — admins see all feedback (anonymous ones hide the user).
 export async function GET(req: NextRequest) {
-  const session = await getSessionFromRequest(req);
-  if (!session) return jsonError("Not authenticated", 401);
+  try {
+    const session = await getSessionFromRequest(req);
+    if (!session) return jsonError("Not authenticated", 401);
 
-  await connectDB();
+    await connectDB();
 
-  if (session.role === "admin") {
-    const feedback = await Feedback.find()
-      .populate("user", "name email role")
+    if (session.role === "admin") {
+      const feedback = await Feedback.find()
+        .populate("user", "name email role")
+        .sort({ createdAt: -1 })
+        .lean();
+      // Strip user info from anonymous submissions before sending to client.
+      const sanitized = feedback.map((f) =>
+        f.anonymous ? { ...f, user: undefined } : f
+      );
+      return jsonOk({ feedback: sanitized });
+    }
+
+    const feedback = await Feedback.find({ user: session.userId })
       .sort({ createdAt: -1 })
       .lean();
-    // Strip user info from anonymous submissions before sending to client.
-    const sanitized = feedback.map((f) =>
-      f.anonymous ? { ...f, user: undefined } : f
-    );
-    return jsonOk({ feedback: sanitized });
+    return jsonOk({ feedback });
+  } catch (err) {
+    console.error("List feedback error:", err);
+    return jsonError("Could not load feedback. Please try again.", 500);
   }
-
-  const feedback = await Feedback.find({ user: session.userId })
-    .sort({ createdAt: -1 })
-    .lean();
-  return jsonOk({ feedback });
 }
 
 // POST /api/feedback — students & faculty submit feedback (optionally anonymous).
