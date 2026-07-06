@@ -1,4 +1,7 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
+// Ensure the referenced User model is registered in every bundle that uses
+// Feedback, so `.populate("user")` works in Vercel's serverless functions.
+import "./User";
 import { FEEDBACK_CATEGORIES } from "@/lib/constants";
 
 export interface IFeedback extends Document {

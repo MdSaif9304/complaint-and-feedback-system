@@ -1,4 +1,7 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
+// Ensure the referenced User model is registered in every bundle that uses
+// Complaint, so `.populate("user")` works in Vercel's serverless functions.
+import "./User";
 import { COMPLAINT_STATUSES, DEPARTMENTS, PRIORITIES } from "@/lib/constants";
 
 export interface IComplaintUpdate {
