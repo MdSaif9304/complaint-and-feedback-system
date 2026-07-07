@@ -30,10 +30,20 @@ if (!global._mongoose) {
 }
 
 export async function connectDB(): Promise<typeof mongoose> {
+  // readyState: 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting.
+  const state = mongoose.connection.readyState;
+
   // Reuse the cached connection only if it is actually still connected.
-  // readyState: 1 = connected, 2 = connecting. Anything else is stale → reconnect.
-  if (cached.conn && mongoose.connection.readyState === 1) {
+  if (cached.conn && state === 1) {
     return cached.conn;
+  }
+
+  // If the socket dropped while the function was idle (a common serverless case
+  // when navigating back to a page), the cached promise resolved to a dead
+  // connection. Discard it so we open a genuinely fresh one below.
+  if (state === 0 || state === 3) {
+    cached.conn = null;
+    cached.promise = null;
   }
 
   if (!cached.promise) {
@@ -44,7 +54,7 @@ export async function connectDB(): Promise<typeof mongoose> {
         // Fail fast (well inside Vercel's function timeout) with a clear error
         // instead of hanging for the 30s default when Atlas is unreachable.
         serverSelectionTimeoutMS: 8000,
-        socketTimeoutMS: 20000,
+        socketTimeoutMS: 45000,
         // Keep the serverless connection pool small.
         maxPoolSize: 10,
       })
